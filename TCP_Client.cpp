@@ -1,53 +1,48 @@
+#include<netinet/in.h>
+#include<sys/socket.h>
+#include<arpa/inet.h>
 #include<iostream>
+#include<unistd.h>
+#include<cstring>
 #include<thread>
 #include<mutex>
-#include<cstring>
-#include<sys/socket.h>
-#include<netinet/in.h>
-#include<arpa/inet.h>
-#include<unistd.h>
+
 #define BUFFER_SIZE 64
-
 using namespace std;
-
 bool Exit=false;
-mutex CheckExit;
+mutex RWExit;
 
 void Send(int* socket_fd)
 {
-        char buffer[BUFFER_SIZE]={0};
-        while(true)
+        char buffer[BUFFER_SIZE];
+        while(!Exit)
         {
                 cin>>buffer;
-                
-                CheckExit.lock();
-                if(!strcmp(buffer,"exit")) Exit=true;
-                CheckExit.unlock();
-                if(Exit) return;
 
-                cout<<"[You]>";
+                if(!strcmp(buffer,"exit"))
+                {
+                        lock_guard<mutex> lg_mtx(RWExit);
+                        Exit=true;
+                }
                 send(*socket_fd,buffer,strlen(buffer)+1,0);
         }
 }
 
 void Recv(int* socket_fd)
 {
-        char buffer[BUFFER_SIZE]={0};
-        while(true)
+        char buffer[BUFFER_SIZE];
+        while(!Exit)
         {
-                CheckExit.lock();
-                if(Exit){CheckExit.unlock();return;}
-                CheckExit.unlock();
-
-                recv(*socket_fd,buffer,sizeof(buffer),0);
-                cout<<"[Server]>"<<(char*)buffer<<endl;
+                int check=recv(*socket_fd,buffer,sizeof(buffer),MSG_DONTWAIT);
+                if(check>0)
+                        cout<<"Server:"<<buffer<<endl;
+                if(check==0)
+                {
+                        lock_guard<mutex> lg_mtx(RWExit);
+                        cout<<"Server is Disconnect,Press anykey + 'Enter' to exit"<<endl;
+                        Exit=true;
+                }
         }
-}
-
-void Disconnect(int* socket_fd)
-{
-        close(*socket_fd);
-        cout<<"Disconnect Successfuly!"<<endl;
 }
 
 void Connect()
@@ -68,7 +63,7 @@ void Connect()
 
         send_thread.join();
         recv_thread.join();
-        Disconnect(&socket_fd);
+        close(socket_fd);
 }
 
 int main()
