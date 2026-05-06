@@ -1,30 +1,52 @@
-#include "TcpServer.h"
+#include<winsock2.h>
+#include<iostream>
+#pragma comment("lib","ws2_32.lib")
+using namespace std;
 
 int main()
 {
-    TcpServer tcps1(5);
-    sockaddr_in client_sa;
+    WSADATA wsadata;
+    WSAStartup(MAKEWORD(2,2),&wsadata);
 
-    std::cout<<"listening..."<<std::endl;
-    int new_fd=tcps1.Wait(client_sa);
-    if(new_fd==-1) return 0;
-    std::cout<<inet_ntoa(client_sa.sin_addr)<<" is join"<<std::endl;
-
-    char send[]="I-am-Server!";
-    tcps1.SendMessage(new_fd,send,strlen(send)+1);
-    tcps1.SendMessage(new_fd,send,strlen(send)+1);
-
-    sleep(3);
-    char* recv_ptr=NULL;
-    while((recv_ptr=tcps1.RecvMessage(new_fd))!=NULL)
+    int listensocket=socket(AF_INET,SOCK_STREAM,0);
+    if(listensocket==INVALID_SOCKET)
     {
-        std::cout<<"server:"<<recv_ptr<<std::endl;
-        tcps1.CloseMessage(recv_ptr);
+        int err=WSAGetLastError();
+        cout<<"error code:"<<err<<endl;
     }
+    sockaddr_in server_sa;
+    server_sa.sin_family=PF_INET;
+    server_sa.sin_addr.S_un.S_addr=htonl(INADDR_ANY);
+    server_sa.sin_port=htons(4399);
+    bind(listensocket,(sockaddr*)&server_sa,sizeof(server_sa));
+    listen(listensocket,5);
 
-    tcps1.RecvFile(new_fd,"./ttt/");
-    tcps1.SendFile(new_fd,"./","ttt2.txt",strlen("ttt2.txt")+1);
+    cout<<"listening..."<<endl;
+    int new_fd=accept(listensocket,NULL,NULL);
+    if(new_fd==INVALID_SOCKET)
+    {
+        int err=WSAGetLastError();
+        cout<<"error code:"<<err<<endl;
+        return -1;
+    }
+    cout<<"client "<<new_fd<<" is join"<<endl;
+    char recvbuffer[64];
+    char sendbuffer[]="received";
 
-    close(new_fd);
+    while(true)
+    {
+        memset(recvbuffer,0,64);
+        int check=recv(new_fd,recvbuffer,64,0);
+        if(check==0||check==SOCKET_ERROR)//Лђеп<=0
+        {
+            cout<<"client "<<new_fd<<" disconnect"<<endl;
+            closesocket(new_fd);
+            break;
+        }
+        cout<<"client "<<new_fd<<":"<<recvbuffer<<endl;
+        send(new_fd,sendbuffer,strlen(sendbuffer)+1,0);
+    }
+    closesocket(listensocket);
+    WSACleanup();
     return 0;
 }
