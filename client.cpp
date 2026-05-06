@@ -1,25 +1,52 @@
-#include "TcpClient.h"
+#include<winsock2.h>
+#include<iostream>
+#pragma comment("lib","ws2_32.lib")
+using namespace std;
 
 int main()
 {
-    TcpClient tcpc1;
-    if(tcpc1.Connect("192.168.232.135",4399)==-1)
-        return 0;
+    WSADATA wsadata;
+    WSAStartup(MAKEWORD(2,2),&wsadata);
 
-    char send[]="hello,world!";
-    tcpc1.SendMessage(send,strlen(send)+1);
-    tcpc1.SendMessage(send,strlen(send)+1);
-
-    sleep(3);
-    char* recv_ptr=NULL;
-    while((recv_ptr=tcpc1.RecvMessage())!=NULL)
+    int fd=socket(AF_INET,SOCK_STREAM,0);
+    if(fd==INVALID_SOCKET)
     {
-        std::cout<<"server:"<<recv_ptr<<std::endl;
-        tcpc1.CloseMessage(recv_ptr);
+        int err=WSAGetLastError();
+        cout<<"error code:"<<err<<endl;
     }
+    sockaddr_in server_sa;
+    server_sa.sin_family=PF_INET;
+    server_sa.sin_addr.S_un.S_addr=inet_addr("172.20.10.4");
+    server_sa.sin_port=htons(4399);
 
-    tcpc1.SendFile("./","ttt1.txt",strlen("ttt1.txt")+1);
-    tcpc1.RecvFile("./ttt2/");
+    int check=connect(fd,(sockaddr*)&server_sa,sizeof(server_sa));
+    if(check==SOCKET_ERROR)
+    {
+        int err=WSAGetLastError();
+        cout<<"error code:"<<err<<endl;
+        closesocket(fd);
+        return -1;
+    }
+    cout<<"conncet success!"<<endl;
+    char recvbuffer[64];
+    char sendbuffer[64];
 
+    while(true)
+    {
+        memset(recvbuffer,0,64);
+        memset(sendbuffer,0,64);
+        cout<<">";
+        cin>>sendbuffer;
+        if(!strcmp(sendbuffer,"exit"))
+        {
+            cout<<"program exit!"<<endl;
+            closesocket(fd);
+            break;
+        }
+        send(fd,sendbuffer,strlen(sendbuffer)+1,0);
+        recv(fd,recvbuffer,64,0);
+        cout<<"server:"<<recvbuffer<<endl;
+    }
+    WSACleanup();
     return 0;
 }
