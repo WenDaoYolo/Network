@@ -13,7 +13,7 @@ void InitSocket(int& socket_fd,sockaddr_in& server_sai)
     
     server_sai.sin_family=AF_INET;
     server_sai.sin_port=htons(2026);
-    inet_aton("192.168.1.60",&(server_sai.sin_addr));
+    inet_aton("172.20.10.2",&(server_sai.sin_addr));
 }
 
 void Connect(int& socket_fd,sockaddr_in& server_sai)
