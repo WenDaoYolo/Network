@@ -31,11 +31,11 @@ void Channel::HandleEvent()
     {
         if(errorcallback_) errorcallback_();
     }
-    else if(revents_&EPOLLIN)
+    if(revents_&EPOLLIN)
     {
         if(readcallback_) readcallback_();
     }
-    else if(revents_&EPOLLOUT)
+    if(revents_&EPOLLOUT)
     {
         if(writecallback_) writecallback_();
     }

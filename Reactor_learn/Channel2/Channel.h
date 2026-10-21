@@ -14,6 +14,10 @@ class Channel
         bool inepoll_=false;
         uint32_t events_=0;
         uint32_t revents_=0;
+
+        std::function<void()> readcallback_;
+        std::function<void()> writecallback_;
+        std::function<void()> errorcallback_;
     public:
         Channel(int fd,Epoll* ep);
         ~Channel();
@@ -31,10 +35,6 @@ class Channel
         void SetRevents(uint32_t ev);
 
         void HandleEvent();
-        std::function<void()> readcallback_;
-        std::function<void()> writecallback_;
-        std::function<void()> errorcallback_;
-
         void SetReadCallBack(std::function<void()> fun);
         void SetWriteCallBack(std::function<void()> fun);
         void SetErrorCallBack(std::function<void()> fun);
