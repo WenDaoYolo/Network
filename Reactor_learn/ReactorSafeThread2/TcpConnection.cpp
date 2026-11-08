@@ -137,32 +137,31 @@ void TcpConnection::HandleRead()
 
 void TcpConnection::HandleWrite()
 {
-    // 如果缓冲区里没东西可发，直接返回
+    // 1. 没东西可发：若还注册着写事件，关掉
     if (sendbuffer_.ReadAbleBytes() == 0) {
+        if (ch_.IsWriting()) { ch_.DisableWriting(); ep_->Update(&ch_); }
         return;
     }
 
-    // 如果当前没有在监听写事件（说明上一次没遇到 EAGAIN）
-    if (!ch_.IsWriting()) {
-        // 尝试把 SendBuffer 里的数据推给内核
-        ssize_t n = send(sock_.fd(), sendbuffer_.ReadPtr(), sendbuffer_.ReadAbleBytes(), 0);
-        
-        if (n > 0) {
-            // 成功发了 n 个字节，把读指针往后移
-            sendbuffer_.MoveReadPrt(n);
-        } else if (n < 0) {
-            // n < 0 且不是 EAGAIN，说明对端断开了或发生错误
-            if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                HandleClose(); // 直接走关闭逻辑
-                return;
-            }
+    // 2. 有数据就尝试发，不看 IsWriting
+    ssize_t n = send(sock_.fd(), sendbuffer_.ReadPtr(), sendbuffer_.ReadAbleBytes(), 0);
+    if (n > 0) {
+        sendbuffer_.MoveReadPrt(n);
+    } else if (n == 0) {
+        HandleClose();          // 对端关闭/零窗口，按关闭处理
+        return;
+    } else { // n < 0
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            HandleClose();
+            return;
         }
+        // EAGAIN：落到下面开 EPOLLOUT
     }
 
-    // 核心：如果 SendBuffer 里还有数据没发完（内核满了，返回了 EAGAIN）
+    // 3. 按残留决定开/关写事件（幂等）
     if (sendbuffer_.ReadAbleBytes() > 0) {
-        // 注册 EPOLLOUT 写事件，告诉 epoll：“等内核有空间了，你叫我”
-        ch_.EnableWriting(); 
-        ep_->Update(&ch_);
+        if (!ch_.IsWriting()) { ch_.EnableWriting(); ep_->Update(&ch_); }
+    } else {
+        if (ch_.IsWriting()) { ch_.DisableWriting(); ep_->Update(&ch_); }
     }
 }
