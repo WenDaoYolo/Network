@@ -1,6 +1,6 @@
 #include "TcpConnection.h"
 
-TcpConnection::TcpConnection(int fd,Epoll* ep):ep_(ep),sock_(fd),ch_(fd,ep)
+TcpConnection::TcpConnection(int fd,Epoll* ep,CRPC_ThreadPool* tp):ep_(ep),sock_(fd),ch_(fd,ep),tp_(tp)
 {    
     ch_.EnableReading();
     ch_.SetET();
@@ -92,15 +92,16 @@ void TcpConnection::HandleRead()
             buffer_.MoveReadPrt(4);
             std::string msg(buffer_.ReadPtr(),len);
             buffer_.MoveReadPrt(len);
-            
+            auto sptr=shared_from_this();
+
             if(!strcmp(msg.c_str(),"register"))
-                Register();
+                tp_->enqueue([sptr](){sptr->Register();});
             if(!strcmp(msg.c_str(),"login"))
-                Login();
+                tp_->enqueue([sptr](){sptr->Login();});
             if(!strcmp(msg.c_str(),"other1"))
-                Other1();
+                tp_->enqueue([sptr](){sptr->Other1();});
             if(!strcmp(msg.c_str(),"other2"))
-                Other2();
+                tp_->enqueue([sptr](){sptr->Other2();});
         }
         else
             break;//如果数据不完整则跳出循环，等待下次解析

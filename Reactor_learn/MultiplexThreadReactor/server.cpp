@@ -1,9 +1,11 @@
 #include "TcpConnection.h"
 #include "Accepter.h"
 #include<unordered_map>
+#include<memory>
 
-std::unordered_map<int,TcpConnection*> g_maps;
+std::unordered_map<int,std::shared_ptr<TcpConnection>> g_maps;
 Epoll g_ep;
+CRPC_ThreadPool g_tp(9);
 
 void Loop()
 {
@@ -12,16 +14,14 @@ void Loop()
     (
         [&](int client_fd,InetAddress IA)
         {
-            TcpConnection* tmp=new TcpConnection(client_fd,&g_ep);
+            std::shared_ptr<TcpConnection> tmp(new TcpConnection(client_fd,&g_ep,&g_tp));
             g_maps[client_fd]=tmp;
 
             tmp->SetCloseCallBack
             (
                 [&](int close_fd)
                 {
-                    TcpConnection* del=g_maps[close_fd];
                     g_maps.erase(close_fd);
-                    delete del;//
                     std::cout<<"client"<<close_fd<<" disconnect"<<std::endl;
                 }
             );
