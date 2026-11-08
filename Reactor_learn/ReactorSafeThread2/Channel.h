@@ -4,6 +4,7 @@
 #include "Socket.h"
 #include<functional>
 #include<sys/eventfd.h>
+#include<sys/timerfd.h>
 
 class Epoll;
 class TaskQueue;
@@ -42,7 +43,10 @@ class Channel
         void SetReadCallBack(std::function<void()> fun);
         void SetWriteCallBack(std::function<void()> fun);
         void SetErrorCallBack(std::function<void()> fun);
+
+        std::function<void()> GetReadCallBack();
 };
 
 void SetWeakUpChannel(Epoll* ep,TaskQueue* taskq,Channel** wkupch);
+void SetTimmerChannel(Epoll* ep,Channel** tmrch,int sec,int nsec,std::function<void()> fun);
 

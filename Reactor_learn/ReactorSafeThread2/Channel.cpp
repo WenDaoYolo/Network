@@ -76,3 +76,37 @@ void SetWeakUpChannel(Epoll* ep,TaskQueue* taskq,Channel** wkupch)
     );
     ep->Update(*wkupch);
 }
+
+std::function<void()> Channel::GetReadCallBack(){ return readcallback_; }
+
+void SetTimmerChannel(Epoll* ep,Channel** tmrch,int sec,int nsec,std::function<void()> fun)
+{
+    int fd=timerfd_create(CLOCK_MONOTONIC,TFD_CLOEXEC|TFD_NONBLOCK);
+    if(fd==-1)
+    {
+        std::cout<<"timerfd_create error!"<<std::endl;
+        return;
+    }
+
+    struct itimerspec new_value;
+    new_value.it_value.tv_sec=sec;
+    new_value.it_value.tv_nsec=nsec;
+    new_value.it_interval.tv_sec=sec;
+    new_value.it_interval.tv_nsec=nsec;
+    timerfd_settime(fd, 0, &new_value, NULL);
+
+    *tmrch=new Channel(fd,ep);
+    (*tmrch)->EnableReading();
+
+    (*tmrch)->SetReadCallBack
+    (
+        [fd,fun]()
+        {
+            uint64_t nn;
+            read(fd,&nn,sizeof(nn));
+
+            if(fun) fun();
+        }   
+    );
+    ep->Update(*tmrch);
+}
