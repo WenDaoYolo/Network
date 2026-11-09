@@ -29,22 +29,30 @@ void Recv(int socket_fd)
             if(g_exit) break;
         }
         // 客户端接收逻辑
-    char len_buf[4];
-    // 1. 先严格读 4 字节长度（使用 MSG_WAITALL 确保读满）
-    int n = recv(socket_fd, len_buf, 4, MSG_DONTWAIT);
-    if (n == 4) {
-    int net_len = 0;
-    memcpy(&net_len, len_buf, 4);
-    int len = ntohl(net_len); // 网络序转主机序
+        char len_buf[4];
+        // 1. 先严格读 4 字节长度（使用 MSG_WAITALL 确保读满）
+        int n = recv(socket_fd, len_buf, 4, MSG_WAITALL);
+        if (n == 4) 
+        {
+            int net_len = 0;
+            memcpy(&net_len, len_buf, 4);
+            int len = ntohl(net_len); // 网络序转主机序
 
-    // 2. 根据长度读内容
-    char* payload = new char[len + 1];
-    memset(payload, 0, len + 1);
-    recv(socket_fd, payload, len, MSG_WAITALL);
+            // 2. 根据长度读内容
+            char* payload = new char[len + 1];
+            memset(payload, 0, len + 1);
+            recv(socket_fd, payload, len, MSG_WAITALL);
 
-    std::cout << "收到服务端回复: " << payload << std::endl;
-    delete[] payload;
-}
+            std::cout << "收到服务端回复: " << payload << std::endl;
+            delete[] payload;
+        }
+        else if(n==0)
+        {
+            std::cout<<"long time no active,disconnect!"<<std::endl;
+            std::cout<<"input anything then enter to exit!"<<std::endl;
+            g_exit=true;
+            break;
+        }
     }
 }
 
@@ -65,7 +73,7 @@ void Connect(int& socket_fd,sockaddr_in& server_sai)
     while(memset(buffer,0,sizeof(buffer)),true)
     {
         std::cin>>buffer;
-        if(!strcmp(buffer,"exit"))
+        if(!strcmp(buffer,"exit")||g_exit)
         {
             std::lock_guard<std::mutex> lg1(check_exit);
             g_exit=true;
@@ -79,8 +87,8 @@ void Connect(int& socket_fd,sockaddr_in& server_sai)
         std::cout<<"current write nums:"<<write_nums<<std::endl;
     }
 
-    close(socket_fd);
     recv_thread.join();
+    close(socket_fd);
 }
 
 int main()

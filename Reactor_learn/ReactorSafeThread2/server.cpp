@@ -11,6 +11,7 @@ TaskQueue g_taskq(100);
 Channel* g_weakupch=nullptr;
 Channel* g_timmerch1=nullptr;
 Channel* g_timmerch2=nullptr;
+Channel* g_timmerch3=nullptr;
 
 void TimmerLog()
 {
@@ -30,9 +31,29 @@ void TimmerBroadCast()//定时广播
     }
 }
 
-void TimmerClearSocket()//清理长时间无行为的客户端连接
+void TimmerClearSocket(time_t seconds)//清理长时间无行为的客户端连接
 {
-	
+    time_t now=time(nullptr);
+    std::vector<int> clearfds;
+
+    for(auto& pair:g_maps)
+    {
+        if(pair.second!=nullptr)
+        {
+            if(now-pair.second->GetLastActiveTime()>=seconds)
+                clearfds.push_back(pair.first);
+        }
+    }
+
+    for(int i=0;i<clearfds.size();i++)
+    {
+        auto it=g_maps.find(clearfds[i]);
+        if(it!=g_maps.end()&&it->second!=nullptr)
+        {
+            std::cout<<"client "<<it->first<<" more than "<<seconds<<" sec have no data,closed it!"<<std::endl;
+            it->second->HandleClose();
+        }
+    }
 }
 
 void Loop()
@@ -43,6 +64,7 @@ void Loop()
     g_taskq.SetEventfd(g_weakupch->fd());
     SetTimmerChannel(&g_ep,&g_timmerch1,5,0,TimmerLog);
     SetTimmerChannel(&g_ep,&g_timmerch2,10,0,TimmerBroadCast);
+    SetTimmerChannel(&g_ep,&g_timmerch3,5,0,std::bind(TimmerClearSocket,15));
 
     acpt.SetNewConnectionCallBack
     (

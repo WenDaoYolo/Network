@@ -2,6 +2,7 @@
 
 TcpConnection::TcpConnection(int fd,Epoll* ep,CRPC_ThreadPool* tp,TaskQueue* taskq):ep_(ep),sock_(fd),ch_(fd,ep),tp_(tp),taskqueue_(taskq)
 {    
+    last_active_time_=time(nullptr);
     ch_.EnableReading();
     ch_.SetET();
 }
@@ -18,6 +19,8 @@ void TcpConnection::Init()//sate bind callback
     ep_->Update(&ch_);
 }
 
+time_t TcpConnection::GetLastActiveTime(){ return last_active_time_; };
+
 void TcpConnection::SetCloseCallBack(std::function<void(int)> fun){ closecallback_=fun; }
 
 TcpConnection::~TcpConnection(){}
@@ -29,7 +32,14 @@ void TcpConnection::HandleClose()
     else 
         return;//如果不在红黑树则直接退出，防止重复调用关闭连接的回调
     
-    if(closecallback_) closecallback_(sock_.fd());//关闭后该内存会销毁，不要再执行仍和访问操作
+    ch_.SetReadCallBack(nullptr);
+    ch_.SetWriteCallBack(nullptr);
+    ch_.SetErrorCallBack(nullptr);
+    
+    if(closecallback_)
+    {
+        closecallback_(sock_.fd());//关闭后该内存会销毁，不要再执行仍和访问操作
+    }
 }
 
 //////////////////////////////////////////////////
@@ -85,6 +95,7 @@ void TcpConnection::Other2()
 
 void TcpConnection::HandleRead()
 {
+    last_active_time_=time(nullptr);
     while(true)
     {
         size_t readables=recvbuffer_.CheckWritAble(1024);
